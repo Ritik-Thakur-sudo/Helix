@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { findSupportedChatModel } from "@helix/shared";
-import { db } from "@helix/database";
+import { db } from "@helix/database/client";
 import { Role, Mode, MessageStatus } from "@helix/database/enums";
 
 const createSessionSchema = z.object({
