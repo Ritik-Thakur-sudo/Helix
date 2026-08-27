@@ -1,5 +1,6 @@
 import { TextAttributes } from "@opentui/core"
 import { useTheme } from "../providers/theme"
+import { DEFAULT_CHAT_MODEL_ID } from "@helix/shared"
 
 export function StatusBar() {
     const {colors} = useTheme();
@@ -10,7 +11,7 @@ export function StatusBar() {
             <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
                 &gt;
             </text>
-            <text>opus-4-6</text>
+            <text>{DEFAULT_CHAT_MODEL_ID}</text>
         </box>
     )
 }
