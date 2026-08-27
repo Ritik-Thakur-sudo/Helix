@@ -19,6 +19,7 @@
     "@helix/shared": "workspace:*",
     "@opentui/core": "^0.4.1",
     "@opentui/react": "^0.4.1",
+    "date-fns": "^4.4.0",
     "eventsource-parser": "^4.1.0",
     "hono": "^4.12.34",
     "opentui-spinner": "^0.0.7",

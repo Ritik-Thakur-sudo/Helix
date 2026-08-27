@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import type { TextareaRenderable } from "@opentui/core";
-import { useRenderer } from "@opentui/react";
+import { useRenderer, useKeyboard } from "@opentui/react";
 import type { KeyBinding } from "@opentui/core";
 import { EmptyBorder } from "./border";
 import { StatusBar } from "./StatusBar";
@@ -11,6 +11,9 @@ import { useToast } from "../providers/toast";
 import { useKeyboardLayer } from "../providers/keyboardLayer";
 import { useDialog } from "../providers/dialog";
 import { useTheme } from "../providers/theme";
+import { useNavigate } from "react-router";
+import { usePromptConfig } from "../providers/promptConfig";
+import { Mode } from "@helix/database/enums";
 
 type Props = {
   onSubmit: (value: string) => void;
@@ -32,6 +35,8 @@ export function InputBar({ onSubmit, disabled }: Props) {
   const dialog = useDialog();
   const { colors } = useTheme();
   const { isTopLayer, setResponder } = useKeyboardLayer();
+  const navigate = useNavigate();
+  const { mode, toggleMode, setMode, setModel } = usePromptConfig();
 
   const {
     showCommandMenu,
@@ -89,12 +94,16 @@ export function InputBar({ onSubmit, disabled }: Props) {
           exit: () => renderer.destroy(),
           toast,
           dialog,
+          navigate,
+          mode,
+          setMode,
+          setModel,
         });
       } else {
         textarea.setText(command.value + " ");
       }
     },
-    [renderer, toast, dialog],
+    [renderer, toast, dialog, navigate, mode, setMode, setModel],
   );
 
   const handleCommandExecute = useCallback(
@@ -131,6 +140,21 @@ export function InputBar({ onSubmit, disabled }: Props) {
     handleSubmit();
   };
 
+  useKeyboard((key) => {
+    if (disabled) {
+      return;
+    }
+
+    if (!isTopLayer("base")) {
+      return;
+    }
+
+    if (key.name === "tab") {
+      key.preventDefault();
+      toggleMode();
+    }
+  });
+
   // Register the base layer responder for ctrl+c
   useEffect(() => {
     setResponder("base", () => {
@@ -152,7 +176,7 @@ export function InputBar({ onSubmit, disabled }: Props) {
     <box width="100%" alignItems="center">
       <box
         border={["left"]}
-        borderColor={colors.primary}
+        borderColor={mode === Mode.BUILD ? colors.primary : colors.planMode}
         customBorderChars={{
           ...EmptyBorder,
           vertical: "┃",
