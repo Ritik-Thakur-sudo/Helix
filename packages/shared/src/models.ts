@@ -124,4 +124,4 @@ export function findSupportedChatModel(modelId: string) {
   return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
 }
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "openai/gpt-oss-120b";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gemini-3.7-flash";

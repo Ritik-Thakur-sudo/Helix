@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
-import { DEFAULT_CHAT_MODEL_ID } from "@helix/shared";
+import { Mode } from "@helix/database/enums";
 import { useNavigate, useLocation } from "react-router";
 import { SessionShell } from "../components/sessionShell";
 import { UserMessage } from "../components/messages";
@@ -10,6 +10,8 @@ import { getErrorMessage } from "../lib/httpErrors";
 
 const newSessionStateSchema = z.object({
   message: z.string(),
+  mode: z.enum(Mode),
+  model: z.string(),
 });
 
 export function NewSession() {
@@ -20,24 +22,23 @@ export function NewSession() {
 
   const state = useMemo(() => {
     const parsed = newSessionStateSchema.safeParse(location.state);
-
     return parsed.success ? parsed.data : null;
   }, [location.state]);
 
   useEffect(() => {
     if (!state) {
-      navigate("/", { replace: true });
+      navigate("/", {
+        replace: true,
+      });
     }
   }, [state, navigate]);
 
-  // create session on mount
   useEffect(() => {
     if (!state || hasStartedRef.current) {
       return;
     }
 
     hasStartedRef.current = true;
-
     let ignore = false;
 
     const createSession = async () => {
@@ -49,8 +50,8 @@ export function NewSession() {
             initialMessage: {
               role: "USER",
               content: state.message,
-              mode: "BUILD",
-              model: DEFAULT_CHAT_MODEL_ID,
+              mode: state.mode,
+              model: state.model,
             },
           },
         });
@@ -62,12 +63,11 @@ export function NewSession() {
         if (!res.ok) {
           throw new Error(await getErrorMessage(res));
         }
-
         const session = await res.json();
-
-        navigate(`/sessions/${session.id}`,
-          {replace: true, state: { session }}
-        );
+        navigate(`/sessions/${session.id}`, {
+          replace: true,
+          state: { session },
+        });
       } catch (error) {
         if (ignore) {
           return;
@@ -81,8 +81,8 @@ export function NewSession() {
         navigate("/", { replace: true });
       }
     };
-    createSession();
 
+    createSession();
     return () => {
       ignore = true;
     };
@@ -94,7 +94,7 @@ export function NewSession() {
 
   return (
     <SessionShell onSubmit={() => {}} inputDisabled loading>
-      <UserMessage message={state.message} />
+      <UserMessage message={state.message} mode={state.mode} />
     </SessionShell>
   );
 }
