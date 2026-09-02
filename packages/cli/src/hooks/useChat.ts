@@ -10,7 +10,19 @@ import {
   type SupportedChatModelId,
 } from "@helix/shared";
 
-export type ClientMessagePart = { type: "text"; text: string };
+export type ClientToolCallPart = {
+  type: "tool-call";
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  result?: string;
+  status: "calling" | "done";
+};
+
+export type ClientMessagePart =
+  | { type: "reasoning"; text: string }
+  | ClientToolCallPart
+  | { type: "text"; text: string };
 
 export type Message =
   | {
@@ -63,7 +75,6 @@ type SubmitParams = {
 type RunStreamParams = {
   mode: Mode;
   model: SupportedChatModelId;
-
   request: (controller: AbortController) => Promise<ClientResponse<unknown>>;
 };
 
@@ -73,7 +84,6 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
   const [streaming, setStreaming] = useState<StreamingState>({
     status: "idle",
   });
-
   const activeStreamRef = useRef<ActiveStream | null>(null);
 
   const updateMessages = useCallback(
@@ -203,21 +213,57 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
         }
 
         switch (event.type) {
+          case "reasoning-delta": {
+            const last = parts[parts.length - 1];
+            if (last && last.type === "reasoning") {
+              last.text += event.text;
+            } else {
+              parts.push({
+                type: "reasoning",
+                text: event.text,
+              });
+            }
+            emitParts(activeStream.requestId, parts);
+            break;
+          }
+          case "tool-call": {
+            parts.push({
+              type: "tool-call",
+              id: event.toolCallId,
+              name: event.toolName,
+              args: event.args,
+              status: "calling",
+            });
+            emitParts(activeStream.requestId, parts);
+            break;
+          }
+          case "tool-result": {
+            const tc = parts.find(
+              (p): p is ClientToolCallPart =>
+                p.type === "tool-call" && p.id === event.toolCallId,
+            );
+            if (tc) {
+              tc.result = event.result;
+              tc.status = "done";
+            }
+            emitParts(activeStream.requestId, parts);
+            break;
+          }
           case "text-delta": {
             const last = parts[parts.length - 1];
-
             if (last && last.type === "text") {
               last.text += event.text;
             } else {
-              parts.push({ type: "text", text: event.text });
+              parts.push({
+                type: "text",
+                text: event.text,
+              });
             }
             emitParts(activeStream.requestId, parts);
             break;
           }
           case "done": {
-            if (!isActiveRequest(activeStream.requestId)) {
-              return;
-            }
+            if (!isActiveRequest(activeStream.requestId)) return;
 
             const fullText = parts
               .filter((p) => p.type === "text")
@@ -257,6 +303,7 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
   const runStream = useCallback(
     async ({ mode, model, request }: RunStreamParams) => {
       const controller = new AbortController();
+
       const activeStream: ActiveStream = {
         requestId: crypto.randomUUID(),
         controller,
@@ -267,7 +314,13 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
       };
 
       activeStreamRef.current = activeStream;
-      setStreaming({ status: "streaming", parts: [], mode, model });
+
+      setStreaming({
+        status: "streaming",
+        parts: [],
+        mode,
+        model,
+      });
 
       try {
         const response = await request(controller);
@@ -277,7 +330,9 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
           return;
         }
 
-        if (!isActiveRequest(activeStream.requestId)) return;
+        if (!isActiveRequest(activeStream.requestId)) {
+          return;
+        }
 
         const message = error instanceof Error ? error.message : String(error);
         updateMessages((prev) => [
@@ -319,7 +374,6 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
       await runStream({
         mode,
         model,
-
         request: async (controller) => {
           return apiClient.chat[":sessionId"].resume.$post(
             { param: { sessionId } },
@@ -332,12 +386,10 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
   );
 
   const hasAutoResumedRef = useRef(false);
-
   useEffect(() => {
     if (hasAutoResumedRef.current) {
       return;
     }
-
     const last = initialMessages[initialMessages.length - 1];
 
     if (!last || last.role !== "user") {
@@ -345,10 +397,7 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
     }
 
     hasAutoResumedRef.current = true;
-    void resume({
-      mode: last.mode,
-      model: last.model,
-    });
+    void resume({ mode: last.mode, model: last.model });
   }, [initialMessages, resume]);
 
   const submit = useCallback(
@@ -362,7 +411,6 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
         mode,
         model,
       };
-      
       updateMessages((prev) => [...prev, userMessage]);
 
       await runStream({
@@ -389,6 +437,5 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
   const interrupt = useCallback(() => {
     stopActiveStream(true);
   }, [stopActiveStream]);
-
   return { messages, streaming, submit, abort, interrupt };
 }
