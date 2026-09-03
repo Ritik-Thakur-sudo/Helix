@@ -16,6 +16,7 @@ import { isSupportedChatModel, resolveChatModel } from "../lib/models";
 import type { Prisma } from "@helix/database";
 import { createTools } from "../tools";
 import { buildSystemPrompt } from "../systemPrompt";
+import type { AuthenticatedEnv } from "../middleware/requireAuth";
 
 const submitSchema = z.object({
   content: z.string(),
@@ -281,12 +282,16 @@ async function streamAIResponse(
   }
 }
 
-const app = new Hono()
+const app = new Hono<AuthenticatedEnv>()
   .post("/:sessionId/resume", async (c) => {
     const sessionId = c.req.param("sessionId");
+    const userId = c.get("userId");
 
     const session = await db.session.findUnique({
-      where: { id: sessionId },
+      where: {
+        id: sessionId,
+        userId,
+      },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
 
@@ -369,10 +374,12 @@ const app = new Hono()
   })
   .post("/:sessionId", submitValidator, async (c) => {
     const sessionId = c.req.param("sessionId");
+    const userId = c.get("userId");
 
     const session = await db.session.findUnique({
       where: {
         id: sessionId,
+        userId,
       },
       include: {
         messages: {

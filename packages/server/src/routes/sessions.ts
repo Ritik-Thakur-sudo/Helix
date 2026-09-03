@@ -6,6 +6,7 @@ import { z } from "zod";
 import { findSupportedChatModel } from "@helix/shared";
 import { db } from "@helix/database/client";
 import { Role, Mode, MessageStatus } from "@helix/database/enums";
+import type { AuthenticatedEnv } from "../middleware/requireAuth";
 
 const createSessionSchema = z.object({
   title: z.string(),
@@ -36,9 +37,12 @@ const createSessionValidator = zValidator(
   },
 );
 
-const app = new Hono()
+const app = new Hono<AuthenticatedEnv>()
   .get("/", async (c) => {
+    const userId = c.get("userId");
+
     const session = await db.session.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -59,9 +63,13 @@ const app = new Hono()
     // });
 
     const id = c.req.param("id");
+    const userId = c.get("userId");
 
     const session = await db.session.findUnique({
-      where: { id },
+      where: {
+        id,
+        userId,
+      },
       include: {
         messages: {
           orderBy: {
@@ -74,7 +82,7 @@ const app = new Hono()
     if (!session) {
       Sentry.logger.warn("Session not found", {
         sessionId: id,
-        userId: "mockUser",
+        userId,
       });
       return c.json({ error: "Session not found" }, 404);
     }
@@ -92,12 +100,13 @@ const app = new Hono()
     //   message: "Mock error: session loading failed",
     // });
 
+    const userId = c.get("userId");
     const { initialMessage, ...data } = c.req.valid("json");
 
     const session = await db.session.create({
       data: {
         ...data,
-        userId: "mockUser",
+        userId,
         ...(initialMessage && {
           messages: {
             create: {
