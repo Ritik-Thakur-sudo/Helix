@@ -3,10 +3,11 @@ import { Hono } from "hono";
 // import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { findSupportedChatModel } from "@helix/shared";
 import { db } from "@helix/database/client";
 import { Role, Mode, MessageStatus } from "@helix/database/enums";
 import type { AuthenticatedEnv } from "../middleware/requireAuth";
+import { requireCreditsBalance } from "../middleware/requireCreditsBalance";
+import { isSupportedChatModel } from "../lib/models";
 
 const createSessionSchema = z.object({
   title: z.string(),
@@ -16,9 +17,7 @@ const createSessionSchema = z.object({
       role: z.enum(Role),
       content: z.string(),
       mode: z.enum(Mode),
-      model: z
-        .string()
-        .refine((id) => !!findSupportedChatModel(id), "Unsupported model"),
+      model: z.string().refine(isSupportedChatModel, "Unsupported model"),
     })
     .optional(),
 });
@@ -94,7 +93,7 @@ const app = new Hono<AuthenticatedEnv>()
 
     return c.json(session);
   })
-  .post("/", createSessionValidator, async (c) => {
+  .post("/", requireCreditsBalance, createSessionValidator, async (c) => {
     // await new Promise((r) => setTimeout(r, 5000));
     // throw new HTTPException(500, {
     //   message: "Mock error: session loading failed",

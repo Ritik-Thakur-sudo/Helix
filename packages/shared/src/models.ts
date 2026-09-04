@@ -68,13 +68,13 @@ export const SUPPORTED_CHAT_MODELS = [
     },
   },
 
-  // Google Gemini — Free tier
+  // Google Gemini
   {
     id: "gemini-3.7-flash",
     provider: "google",
     pricing: {
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
+      inputUsdPerMillionTokens: 0.75,
+      outputUsdPerMillionTokens: 3.75,
     },
   },
 
@@ -82,8 +82,8 @@ export const SUPPORTED_CHAT_MODELS = [
     id: "gemini-2.5-flash",
     provider: "google",
     pricing: {
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
+      inputUsdPerMillionTokens: 0.3,
+      outputUsdPerMillionTokens: 2.5,
     },
   },
 
@@ -91,18 +91,18 @@ export const SUPPORTED_CHAT_MODELS = [
     id: "gemini-2.5-flash-lite",
     provider: "google",
     pricing: {
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
+      inputUsdPerMillionTokens: 0.1,
+      outputUsdPerMillionTokens: 0.4,
     },
   },
 
-  // Groq — Free tier
+  // Groq
   {
     id: "openai/gpt-oss-120b",
     provider: "groq",
     pricing: {
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
+      inputUsdPerMillionTokens: 0.15,
+      outputUsdPerMillionTokens: 0.6,
     },
   },
 
@@ -110,8 +110,8 @@ export const SUPPORTED_CHAT_MODELS = [
     id: "openai/gpt-oss-20b",
     provider: "groq",
     pricing: {
-      inputUsdPerMillionTokens: 0,
-      outputUsdPerMillionTokens: 0,
+      inputUsdPerMillionTokens: 0.075,
+      outputUsdPerMillionTokens: 0.3,
     },
   },
 ] as const satisfies readonly SupportedChatModelDefinition[];

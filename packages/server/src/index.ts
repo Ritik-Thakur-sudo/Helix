@@ -6,6 +6,7 @@ import { sentry } from "@sentry/hono/bun";
 import chat from "./routes/chat";
 import auth from "./routes/auth";
 import { requireAuth } from "./middleware/requireAuth";
+import billing from "./routes/billing";
 
 const app = new Hono();
 
@@ -58,10 +59,13 @@ app.onError((error, c) => {
 
 app.use("/sessions/*", requireAuth);
 app.use("/chat/*", requireAuth);
+app.use("/billing/checkout", requireAuth);
+app.use("/billing/portal", requireAuth);
 
 const routes = app
   .route("/auth", auth)
   .route("/sessions", sessions)
+  .route("/billing", billing)
   .route("/chat", chat);
 
 export type AppType = typeof routes;
