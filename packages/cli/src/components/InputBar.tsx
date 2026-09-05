@@ -19,7 +19,7 @@ import { useDialog } from "../providers/dialog";
 import { useTheme } from "../providers/theme";
 import { useNavigate } from "react-router";
 import { usePromptConfig } from "../providers/promptConfig";
-import { Mode } from "@helix/database/enums";
+import { Mode } from "@helix/shared";
 import { readdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { TextAttributes } from "@opentui/core";

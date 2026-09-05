@@ -1,10 +1,10 @@
 import { EmptyBorder } from "../border";
 import { useTheme } from "../../providers/theme";
-import { Mode } from "@helix/database/enums";
+import { Mode, type ModeType } from "@helix/shared";
 
 type Props = {
   message: string;
-  mode: Mode;
+  mode: ModeType;
 };
 
 export function UserMessage({ message, mode }: Props) {

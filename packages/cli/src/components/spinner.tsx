@@ -1,9 +1,9 @@
 import "opentui-spinner/react";
 import { useTheme } from "../providers/theme";
-import { Mode } from "@helix/database/enums";
+import { Mode, type ModeType } from "@helix/shared";
 
 type Props = {
-  mode?: Mode;
+  mode?: ModeType;
 };
 
 export function Spinner({ mode = Mode.BUILD }: Props) {

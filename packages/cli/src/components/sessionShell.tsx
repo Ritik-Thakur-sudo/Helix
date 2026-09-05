@@ -20,7 +20,7 @@ export function SessionShell({
   interruptible = false,
 }: Props) {
   const { mode } = usePromptConfig();
-  
+
   return (
     <box
       flexDirection="column"
@@ -32,7 +32,7 @@ export function SessionShell({
       gap={1}
     >
       <scrollbox flexGrow={1} width="100%" stickyScroll stickyStart="bottom">
-        <box gap={1}>{children}</box>
+        <box>{children}</box>
       </scrollbox>
       <box flexShrink={0}>
         <InputBar onSubmit={onSubmit} disabled={inputDisabled} />

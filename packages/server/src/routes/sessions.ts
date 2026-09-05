@@ -4,22 +4,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "@helix/database/client";
-import { Role, Mode, MessageStatus } from "@helix/database/enums";
 import type { AuthenticatedEnv } from "../middleware/requireAuth";
 import { requireCreditsBalance } from "../middleware/requireCreditsBalance";
-import { isSupportedChatModel } from "../lib/models";
 
 const createSessionSchema = z.object({
   title: z.string(),
-  cwd: z.string().optional(),
-  initialMessage: z
-    .object({
-      role: z.enum(Role),
-      content: z.string(),
-      mode: z.enum(Mode),
-      model: z.string().refine(isSupportedChatModel, "Unsupported model"),
-    })
-    .optional(),
 });
 
 const createSessionValidator = zValidator(
@@ -69,13 +58,6 @@ const app = new Hono<AuthenticatedEnv>()
         id,
         userId,
       },
-      include: {
-        messages: {
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
     });
 
     if (!session) {
@@ -88,7 +70,6 @@ const app = new Hono<AuthenticatedEnv>()
 
     Sentry.logger.info("Loaded session", {
       sessionId: session.id,
-      messageCount: session.messages.length,
     });
 
     return c.json(session);
@@ -100,23 +81,12 @@ const app = new Hono<AuthenticatedEnv>()
     // });
 
     const userId = c.get("userId");
-    const { initialMessage, ...data } = c.req.valid("json");
+    const data = c.req.valid("json");
 
     const session = await db.session.create({
       data: {
         ...data,
         userId,
-        ...(initialMessage && {
-          messages: {
-            create: {
-              ...initialMessage,
-              status: MessageStatus.COMPLETE,
-            },
-          },
-        }),
-      },
-      include: {
-        messages: true,
       },
     });
 
