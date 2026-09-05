@@ -593,12 +593,6 @@ Issues, ideas, architectural discussions, and contributions are welcome as the p
 
 If you find a bug or have an idea for improving Helix, open an issue or start a discussion in the repository.
 
-## 📄 License
-
-This project is currently under active development.
-
-License information will be added as the project moves toward its public release and distribution phase.
-
 ---
 
 <p align="center">
