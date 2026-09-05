@@ -1,7 +1,7 @@
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
 import { usePromptConfig } from "../providers/promptConfig";
-import { Mode } from "@helix/database/enums";
+import { Mode } from "@helix/shared";
 
 export function StatusBar() {
   const { colors } = useTheme();

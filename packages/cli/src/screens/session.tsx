@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router";
 import z from "zod";
 import type { InferResponseType } from "hono/client";
@@ -7,12 +7,10 @@ import { useToast } from "../providers/toast";
 import { getErrorMessage } from "../lib/httpErrors";
 import { apiClient } from "../lib/apiClient";
 import { SessionShell } from "../components/sessionShell";
-import prettyMs from "pretty-ms";
-import { messagePartsSchema, type SupportedChatModelId } from "@helix/shared";
+import { type SupportedChatModelId, type ModeType } from "@helix/shared";
 import { useChat } from "../hooks/useChat";
-import type { Message, ClientMessagePart } from "../hooks/useChat";
+import type { Message } from "../hooks/useChat";
 import { useKeyboard } from "@opentui/react";
-import { MessageStatus } from "@helix/database/enums";
 import { useKeyboardLayer } from "../providers/keyboardLayer";
 import { usePromptConfig } from "../providers/promptConfig";
 
@@ -25,107 +23,107 @@ const sessionLocationSchema = z.object({
   session: z.custom<SessionData>(
     (val) => val != null && typeof val === "object" && "id" in val,
   ),
+
+  initialPrompt: z
+    .object({
+      message: z.string(),
+      mode: z.custom<ModeType>(),
+      model: z.custom<SupportedChatModelId>(),
+    })
+    .optional(),
 });
-
-function mapDbMessages(dbMessages: SessionData["messages"]): Message[] {
-  return dbMessages.map((m): Message => {
-    if (m.role === "ERROR") {
-      return { id: m.id, role: "error", content: m.content };
-    }
-
-    if (m.role === "USER") {
-      return {
-        id: m.id,
-        role: "user",
-        content: m.content,
-        mode: m.mode,
-        model: m.model as SupportedChatModelId,
-      };
-    }
-
-    const parsedParts =
-      m.parts == null ? null : messagePartsSchema.safeParse(m.parts);
-    const parts: ClientMessagePart[] = parsedParts?.success
-      ? parsedParts.data.map((p) =>
-          p.type === "tool-call" ? { ...p, status: "done" as const } : p,
-        )
-      : [];
-
-    return {
-      id: m.id,
-      role: "assistant",
-      content: m.content,
-      model: m.model as SupportedChatModelId,
-      mode: m.mode,
-      parts,
-      ...(m.duration != null ? { duration: prettyMs(m.duration * 1000) } : {}),
-      interrupted: m.status === MessageStatus.INTERRUPTED,
-    };
-  });
-}
 
 function ChatMessage({ message }: { message: Message }) {
   if (message.role === "user") {
-    return <UserMessage message={message.content} mode={message.mode} />;
-  }
+    const text = message.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("");
 
-  if (message.role === "error") {
-    return <ErrorMessage message={message.content} />;
+    return (
+      <UserMessage message={text} mode={message.metadata?.mode ?? "BUILD"} />
+    );
   }
 
   return (
     <BotMessage
       parts={message.parts}
-      model={message.model}
-      mode={message.mode}
-      duration={message.duration}
+      model={message.metadata?.model ?? "unknown"}
+      mode={message.metadata?.mode ?? "BUILD"}
+      durationMs={message.metadata?.durationMs}
       streaming={false}
-      interrupted={message.interrupted}
     />
   );
 }
 
-function SessionChat({ session }: { session: SessionData }) {
-  const [initialMessages] = useState(() => mapDbMessages(session.messages));
+function SessionChat({
+  session,
+  initialPrompt,
+}: {
+  session: SessionData;
+  initialPrompt?: {
+    message: string;
+    mode: ModeType;
+    model: SupportedChatModelId;
+  };
+}) {
+  const [initialMessages] = useState(
+    () => session.messages as unknown as Message[],
+  );
   const { mode, model } = usePromptConfig();
   const { isTopLayer } = useKeyboardLayer();
-  const { messages, streaming, submit, abort, interrupt } = useChat(
+
+  const { messages, status, submit, abort, interrupt, error } = useChat(
     session.id,
     initialMessages,
   );
 
+  const hasSubmittedInitialPromptRef = useRef(false);
+
+  // stop pending reply when user leaves this sessions.
   useEffect(() => {
-    return () => abort();
+    return () => {
+      void abort();
+    };
   }, [abort]);
 
   useKeyboard((key) => {
-    if (
-      key.name === "escape" &&
-      isTopLayer("base") &&
-      streaming.status === "streaming"
-    ) {
+    if (key.name === "escape" && isTopLayer("base") && status === "streaming") {
       key.preventDefault();
       interrupt();
     }
   });
 
+  useEffect(() => {
+    if (!initialPrompt || hasSubmittedInitialPromptRef.current) {
+      return;
+    }
+
+    hasSubmittedInitialPromptRef.current = true;
+
+    void submit({
+      userText: initialPrompt.message,
+      mode: initialPrompt.mode,
+      model: initialPrompt.model,
+    });
+  }, [initialPrompt, submit]);
+
   return (
     <SessionShell
-      onSubmit={(text) => submit({ userText: text, mode, model })}
-      loading={streaming.status === "streaming"}
-      interruptible={streaming.status === "streaming"}
+      onSubmit={(text) =>
+        submit({
+          userText: text,
+          mode,
+          model,
+        })
+      }
+      loading={status === "submitted" || status === "streaming"}
+      interruptible={status === "submitted" || status === "streaming"}
     >
       {messages.map((message) => (
         <ChatMessage key={message.id} message={message} />
       ))}
-      {streaming.status === "streaming" && streaming.parts.length > 0 && (
-        <BotMessage
-          parts={streaming.parts}
-          model={streaming.model}
-          mode={streaming.mode}
-          streaming
-        />
-      )}
+      {error && <ErrorMessage message={error.message} />}
     </SessionShell>
   );
 }
@@ -138,13 +136,16 @@ export function Session() {
 
   const prefetched = useMemo(() => {
     const parsed = sessionLocationSchema.safeParse(location.state);
-    return parsed.success ? parsed.data.session : null;
+
+    return parsed.success ? parsed.data : null;
   }, [location.state]);
 
-  const [session, setSession] = useState<SessionData | null>(prefetched);
+  const [session, setSession] = useState<SessionData | null>(
+    prefetched?.session ?? null,
+  );
 
   useEffect(() => {
-    if (prefetched) {
+    if (prefetched?.session) {
       return;
     }
 
@@ -193,5 +194,11 @@ export function Session() {
   if (!session) {
     return <SessionShell onSubmit={() => {}} inputDisabled loading />;
   }
-  return <SessionChat key={session.id} session={session} />;
+  return (
+    <SessionChat
+      key={session.id}
+      session={session}
+      initialPrompt={prefetched?.initialPrompt}
+    />
+  );
 }
